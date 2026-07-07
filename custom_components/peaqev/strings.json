@@ -78,6 +78,13 @@
           "volvo_soc_sensor": "Volvo Connected Car SoC sensor entity",
           "charger_efficiency": "Charger efficiency (0.5\u20131.0)"
         }
+      },
+      "simulation": {
+        "title": "Simulation Mode",
+        "description": "Enable simulation mode for Docker-based testing with dummy entity helpers.",
+        "data": {
+          "simulation_mode": "Enable Simulator Mode (use dummy entity IDs)"
+        }
       }
     }
   },
@@ -180,6 +187,13 @@
         "data": {
           "volvo_soc_sensor": "Volvo Connected Car SoC sensor entity",
           "charger_efficiency": "Charger efficiency (0.5\u20131.0)"
+        }
+      },
+      "simulation": {
+        "title": "Simulation Mode",
+        "description": "Enable simulation mode for Docker-based testing with dummy entity helpers.",
+        "data": {
+          "simulation_mode": "Enable Simulator Mode (use dummy entity IDs)"
         }
       }
     },

@@ -15,6 +15,7 @@ from custom_components.peaqev.configflow.config_flow_schemas import (
     CHARGER_DETAILS_SCHEMA, CHARGER_SCHEMA, DEPARTURE_SCHEDULING_SCHEMA,
     HOURS_SCHEMA, INTERVAL_PLANNING_SCHEMA, MONTHS_SCHEMA,
     OUTLET_DETAILS_SCHEMA, PRICEAWARE_HOURS_SCHEMA, PRICEAWARE_SCHEMA,
+    SIMULATION_SCHEMA,
     SENSOR_SCHEMA, TARIFF_SCHEMA, TYPE_SCHEMA)
 from custom_components.peaqev.configflow.config_flow_validation import \
     ConfigFlowValidation
@@ -198,11 +199,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Departure scheduling settings"""
         if user_input is not None:
             self.data.update(user_input)
-            return await self.async_step_misc()
+            return await self.async_step_simulation()
 
         return self.async_show_form(
             step_id='departure_scheduling',
             data_schema=DEPARTURE_SCHEDULING_SCHEMA,
+            last_step=False,
+        )
+
+    async def async_step_simulation(self, user_input=None):
+        """Simulation mode settings"""
+        if user_input is not None:
+            self.data.update(user_input)
+            return await self.async_step_misc()
+
+        return self.async_show_form(
+            step_id='simulation',
+            data_schema=SIMULATION_SCHEMA,
             last_step=False,
         )
 
@@ -433,7 +446,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Departure scheduling options"""
         if user_input is not None:
             self.options.update(user_input)
-            return await self.async_step_misc()
+            return await self.async_step_simulation()
 
         _volvo_sensor = await self._get_existing_param('volvo_soc_sensor', '')
         _efficiency = await self._get_existing_param('charger_efficiency', 0.9)
@@ -447,6 +460,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional('charger_efficiency', default=_efficiency): vol.All(
                         vol.Coerce(float), vol.Range(min=0.5, max=1.0)
                     ),
+                }
+            ),
+        )
+
+    async def async_step_simulation(self, user_input=None):
+        """Simulation mode options"""
+        if user_input is not None:
+            self.options.update(user_input)
+            return await self.async_step_misc()
+
+        _sim_mode = await self._get_existing_param('simulation_mode', False)
+
+        return self.async_show_form(
+            step_id='simulation',
+            last_step=False,
+            data_schema=vol.Schema(
+                {
+                    vol.Optional('simulation_mode', default=_sim_mode): cv.boolean,
                 }
             ),
         )

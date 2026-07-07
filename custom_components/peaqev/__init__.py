@@ -10,6 +10,8 @@ from peaqevcore.common.spotprice.models.spotprice_type import SpotPriceType
 
 from custom_components.peaqev.peaqservice.hub.models.hub_options import \
     HubOptions
+from custom_components.peaqev.peaqservice.tariff.simulation_config import \
+    SimulationEntityMapper
 from custom_components.peaqev.peaqservice.util.constants import TYPELITE
 from custom_components.peaqev.services import async_prepare_register_services
 
@@ -26,6 +28,16 @@ async def async_setup_entry(hass: HomeAssistant, conf: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][conf.entry_id] = conf.data
     options = await async_set_options(conf)
+
+    # Apply simulation entity overrides before hub creation
+    if options.simulation.enabled:
+        _LOGGER.info("peaqev Simulation Mode is ENABLED. Using dummy entity IDs.")
+        mapper = SimulationEntityMapper(options.simulation)
+        _apply_simulation_overrides(options, mapper)
+        hass.data[DOMAIN]['simulation'] = True
+    else:
+        hass.data[DOMAIN]['simulation'] = False
+
     hub = await HubFactory.async_create(hass, options, DOMAIN)
     hass.data[DOMAIN]['hub'] = hub
     await hub.async_setup()
@@ -35,6 +47,29 @@ async def async_setup_entry(hass: HomeAssistant, conf: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(conf, PLATFORMS)
     return True
+
+
+def _apply_simulation_overrides(options: HubOptions, mapper: SimulationEntityMapper) -> None:
+    """Override entity IDs in options with simulation dummy entities."""
+    # Tariff sensor
+    options.tariff.sensor_entity = mapper.resolve_tariff_sensor(options.tariff.sensor_entity)
+    # Volvo SoC sensor
+    options.departure_scheduling.volvo_soc_sensor = mapper.resolve_volvo_soc_sensor(
+        options.departure_scheduling.volvo_soc_sensor
+    )
+    # Spot price sensor
+    if options.price.custom_sensor:
+        options.price.custom_sensor = mapper.resolve_spot_price_sensor(options.price.custom_sensor)
+    # Power sensor (smart meter)
+    if not options.peaqev_lite and options.powersensor:
+        options.powersensor = mapper.resolve_power_sensor(options.powersensor)
+    _LOGGER.debug(
+        "Simulation overrides applied: tariff=%s, volvo=%s, spotprice=%s, power=%s",
+        options.tariff.sensor_entity,
+        options.departure_scheduling.volvo_soc_sensor,
+        options.price.custom_sensor,
+        options.powersensor,
+    )
 
 
 PRICE_CHANGES = [
@@ -52,6 +87,7 @@ PRICE_CHANGES = [
 RELOAD_CHANGES = [
     'fuse_type', 'gainloss', 'price_aware', 'name', 'powersensorincludescar',
     'custom_price_sensor', 'tariff', 'interval_planning', 'departure_scheduling',
+    'simulation',
 ]
 
 
@@ -142,6 +178,9 @@ async def async_set_options(conf) -> HubOptions:
     # Departure scheduling options
     options.departure_scheduling.volvo_soc_sensor = await async_get_existing_param(conf, 'volvo_soc_sensor', '')
     options.departure_scheduling.charger_efficiency = await async_get_existing_param(conf, 'charger_efficiency', 0.9)
+
+    # Simulation mode
+    options.simulation.enabled = await async_get_existing_param(conf, 'simulation_mode', False)
 
     return options
 

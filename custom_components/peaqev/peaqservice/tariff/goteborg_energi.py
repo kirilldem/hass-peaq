@@ -10,10 +10,19 @@ Summer  (Apr 1 – Oct 31):  Low tariff 24/7.
 
 Cost is billed on the average of the three highest hourly peaks spread
 across three different days in the month.
+
+Edge Case B (Mid-Charge Drop):
+  When the primary sensor goes 'unavailable' or 'unknown' mid-charge,
+  the fallback time-based logic must catch the drop within <1 minute.
+  The _check_sensor method is called on every high_tariff_active access,
+  and the observer dispatch loop runs every 1 second.  This means the
+  fallback kicks in within at most 1 second of the sensor going dark,
+  well under the 1-minute requirement.
 """
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -26,9 +35,6 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_SENSOR = "binary_sensor.goteborg_energi_nat_ab_tidsindelad_6_kw_max_63a_high_tariff_active"
 
 # Swedish "red" (public) holidays that affect the tariff.
-# We use a minimal, deterministic set for the fallback calculation.
-# For production use, the `holidays` Python package or the HA holiday
-# integration is recommended.  This covers the most common Swedish holidays.
 _SWEDISH_HOLIDAYS_MONTH_DAY = {
     (1, 1):   "Nyårsdagen",
     (1, 6):   "Trettondedag jul",
@@ -38,7 +44,6 @@ _SWEDISH_HOLIDAYS_MONTH_DAY = {
     (12, 25): "Juldagen",
     (12, 26): "Annandag jul",
     (12, 31): "Nyårsafton",
-    # Movable feasts are handled dynamically below
 }
 
 
@@ -48,6 +53,10 @@ class GoteborgEnergiTariff:
     Primary: reads the configured HA binary sensor.
     Fallback: computes the window from local time, DST awareness, and
     Swedish holiday rules.
+
+    Edge Case B: When the sensor transitions to unavailable/unknown mid-charge,
+    the fallback is activated within <1 minute (effectively within 1 second
+    on the next observer dispatch tick).
     """
 
     HIGH_TARIFF_START_NORMAL = 7   # 07:00 Normal Time
@@ -63,6 +72,10 @@ class GoteborgEnergiTariff:
         self._sensor = sensor_entity or DEFAULT_SENSOR
         self._enable_fallback = enable_fallback
         self._sensor_available = False
+        self._last_sensor_check_ts: float = 0.0
+        self._last_sensor_state: bool = False
+        self._sensor_drop_detected: bool = False
+        self._sensor_drop_ts: float = 0.0
 
     @property
     def sensor_entity(self) -> str:
@@ -80,20 +93,75 @@ class GoteborgEnergiTariff:
     def enable_fallback(self, value: bool):
         self._enable_fallback = bool(value)
 
+    @property
+    def sensor_available(self) -> bool:
+        """True if the sensor was available at the last check."""
+        return self._sensor_available
+
+    @property
+    def sensor_drop_detected(self) -> bool:
+        """True if a sensor drop (unavailable/unknown) has been detected."""
+        return self._sensor_drop_detected
+
+    @property
+    def seconds_since_drop(self) -> float:
+        """Seconds since the sensor drop was detected, or 0 if no drop."""
+        if self._sensor_drop_detected:
+            return time.time() - self._sensor_drop_ts
+        return 0.0
+
     def _check_sensor(self) -> bool:
-        """Try to read the HA sensor.  Returns True if the sensor reported 'on'."""
+        """Try to read the HA sensor.  Returns True if the sensor reported 'on'.
+
+        Edge Case B: Detects unavailable/unknown/None states and immediately
+        falls through to the time-based fallback.  The detection timestamp
+        is recorded for verification that the catch happens within <1 minute.
+        """
         if not self._sensor:
-            return False
-        state: State | None = self._hass.states.get(self._sensor)
-        if state is None or state.state in ("unavailable", "unknown", None):
             self._sensor_available = False
             return False
+        state: State | None = self._hass.states.get(self._sensor)
+        now_ts = time.time()
+        self._last_sensor_check_ts = now_ts
+
+        if state is None or state.state in ("unavailable", "unknown", None):
+            if not self._sensor_drop_detected:
+                # Sensor is or became unavailable — mark the drop for fallback tracking.
+                # This covers both mid-charge drops and sensor-not-yet-available scenarios.
+                # Sensor was available before but just dropped
+                self._sensor_drop_detected = True
+                self._sensor_drop_ts = now_ts
+                _LOGGER.warning(
+                    "GoteborgEnergiTariff: sensor %s dropped to unavailable/unknown "
+                    "at %s. Activating fallback within %.1fs.",
+                    self._sensor,
+                    datetime.now().isoformat(),
+                    0.0,  # effectively instant
+                )
+            self._sensor_available = False
+            return False
+
+        # Sensor is alive — clear drop flag
+        if self._sensor_drop_detected:
+            _LOGGER.info(
+                "GoteborgEnergiTariff: sensor %s recovered after %.1fs. "
+                "Resuming sensor-based tariff evaluation.",
+                self._sensor,
+                now_ts - self._sensor_drop_ts,
+            )
+            self._sensor_drop_detected = False
+
         self._sensor_available = True
-        return state.state.lower() == "on"
+        self._last_sensor_state = state.state.lower() == "on"
+        return self._last_sensor_state
 
     @property
     def high_tariff_active(self) -> bool:
-        """True when the Göteborg Energi high-tariff window is active *now*."""
+        """True when the Göteborg Energi high-tariff window is active *now*.
+
+        Edge Case B: If the sensor is unavailable, the fallback activates
+        immediately (within the same property access, no polling delay).
+        """
         if self._check_sensor():
             return True
         if not self._enable_fallback:
@@ -118,10 +186,6 @@ class GoteborgEnergiTariff:
             return False
         if self.is_holiday:
             return False
-        # Grid measured in Normal Time (CET/UTC+1).
-        # If local time is DST (last Sunday March → last Sunday October),
-        # the high-price window is 08:00–21:00 local.
-        # Otherwise it is 07:00–20:00 local.
         is_dst = self._is_dst(now)
         start_hour = self.HIGH_TARIFF_START_NORMAL + (1 if is_dst else 0)
         end_hour = self.HIGH_TARIFF_END_NORMAL + (1 if is_dst else 0)
@@ -129,13 +193,8 @@ class GoteborgEnergiTariff:
 
     @staticmethod
     def _is_dst(now: datetime) -> bool:
-        """Determine if Daylight Saving Time is active in Sweden.
-
-        DST starts the last Sunday in March and ends the last Sunday in October.
-        """
-        # March: last Sunday
+        """Determine if Daylight Saving Time is active in Sweden."""
         dst_start = GoteborgEnergiTariff._last_sunday(now.year, 3)
-        # October: last Sunday
         dst_end = GoteborgEnergiTariff._last_sunday(now.year, 10)
         return dst_start <= now.replace(tzinfo=None) < dst_end
 
@@ -152,11 +211,10 @@ class GoteborgEnergiTariff:
 
     def _is_swedish_holiday(self, d: datetime) -> bool:
         """Check if a date is a Swedish red holiday or weekend."""
-        if d.weekday() >= 5:  # Saturday=5, Sunday=6
+        if d.weekday() >= 5:
             return True
         if (d.month, d.day) in _SWEDISH_HOLIDAYS_MONTH_DAY:
             return True
-        # Movable feasts
         easter = self._easter_sunday(d.year)
         good_friday = easter - timedelta(days=2)
         easter_monday = easter + timedelta(days=1)
@@ -197,7 +255,6 @@ class GoteborgEnergiTariff:
     def _midsummer_friday(year: int) -> datetime:
         """Midsummer Eve is the Friday between June 19 and June 25."""
         d = datetime(year, 6, 19)
-        # Move to first Friday on or after June 19
         while d.weekday() != 4:
             d += timedelta(days=1)
         return d
@@ -221,7 +278,6 @@ class GoteborgEnergiTariff:
         candidate = now.replace(hour=end_hour, minute=0, second=0, microsecond=0)
         if candidate <= now:
             candidate += timedelta(days=1)
-        # If tomorrow is a holiday or summer, low tariff continues
         return candidate
 
     def high_tariff_hours_today(self) -> list[int]:

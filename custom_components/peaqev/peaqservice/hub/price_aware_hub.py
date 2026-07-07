@@ -48,11 +48,12 @@ class PriceAwareHub(HomeAssistantHub):
             )
 
         if self._interval_planner is not None:
+            volvo_sensor = options.departure_scheduling.volvo_soc_sensor or None
             self._departure_scheduler = DepartureScheduler(
                 hub=self,
                 interval_planner=self._interval_planner,
                 tariff=self._tariff,
-                volvo_soc_sensor=options.departure_scheduling.volvo_soc_sensor or None,
+                volvo_soc_sensor=volvo_sensor,
                 charger_efficiency=options.departure_scheduling.charger_efficiency,
             )
 

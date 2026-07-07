@@ -3,6 +3,8 @@ from typing import List
 
 from peaqevcore.common.spotprice.models.spotprice_type import SpotPriceType
 
+from custom_components.peaqev.peaqservice.tariff.simulation_config import \
+    SimulationConfig
 from custom_components.peaqev.peaqservice.util.options_comparer import \
     OptionsComparer
 
@@ -57,6 +59,7 @@ class HubOptions:
     tariff: Tariff = field(init=False)
     interval_planning: IntervalPlanning = field(init=False)
     departure_scheduling: DepartureScheduling = field(init=False)
+    simulation: SimulationConfig = field(init=False)
     peaqev_lite: bool = False
     powersensor_includes_car: bool = False
     powersensor: str = field(init=False)
@@ -74,6 +77,7 @@ class HubOptions:
         self.tariff = Tariff()
         self.interval_planning = IntervalPlanning()
         self.departure_scheduling = DepartureScheduling()
+        self.simulation = SimulationConfig()
 
     @property
     def startpeaks(self):
@@ -89,6 +93,9 @@ class HubOptions:
                 diff.append(key)
             elif key in ['charger', 'price', 'tariff', 'interval_planning', 'departure_scheduling']:
                 diff.extend(value.compare(other=other.__dict__[key]))
+            elif key in ['simulation']:
+                if value.enabled != other.__dict__[key].enabled:
+                    diff.append(key)
             elif value != other.__dict__[key]:
                 diff.append(key)
         return diff

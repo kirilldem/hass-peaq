@@ -126,6 +126,12 @@ DEPARTURE_SCHEDULING_SCHEMA = vol.Schema(
     }
 )
 
+SIMULATION_SCHEMA = vol.Schema(
+    {
+        vol.Optional('simulation_mode', default=False): cv.boolean,
+    }
+)
+
 SCHEMAS = [
     SENSOR_SCHEMA,
     CHARGER_SCHEMA,
@@ -135,4 +141,5 @@ SCHEMAS = [
     TARIFF_SCHEMA,
     INTERVAL_PLANNING_SCHEMA,
     DEPARTURE_SCHEDULING_SCHEMA,
+    SIMULATION_SCHEMA,
 ]
