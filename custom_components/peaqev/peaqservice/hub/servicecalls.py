@@ -23,16 +23,6 @@ class ServiceCalls:
         self.hub = hub
         self.observer = observer
 
-    async def async_call_enable_peaq(self):
-        """peaqev.enable"""
-        await self.observer.async_broadcast(ObserverTypes.UpdateChargerEnabled, True)
-        await self.observer.async_broadcast(ObserverTypes.UpdateChargerDone, False)
-
-    async def async_call_disable_peaq(self):
-        """peaqev.disable"""
-        await self.observer.async_broadcast(ObserverTypes.UpdateChargerEnabled, False)
-        await self.observer.async_broadcast(ObserverTypes.UpdateChargerDone, False)
-
     async def async_call_override_nonhours(self, hours: int = 1):
         """peaqev.override_nonhours"""
         if self.hub.hours.price_aware:

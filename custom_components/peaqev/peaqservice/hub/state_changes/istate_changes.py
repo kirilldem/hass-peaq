@@ -106,9 +106,14 @@ class StateChangesBase:
         await self.async_handle_outlet_updates()
 
     async def async_update_total_energy_and_peak(self, value) -> None:
-        self.hub.sensors.totalhourlyenergy.value = value
-        await self.hub.observer.async_broadcast(ObserverTypes.UpdatePeak, (float(value), datetime.now()))
-        await self.hub.chargecontroller.savings.async_add_consumption(float(value))
+        try:
+            float_value = float(value)
+        except (ValueError, TypeError) as e:
+            _LOGGER.debug(f'Skipping total energy update: could not convert value "{value}" to float. {e}')
+            return
+        self.hub.sensors.totalhourlyenergy.value = float_value
+        await self.hub.observer.async_broadcast(ObserverTypes.UpdatePeak, (float_value, datetime.now()))
+        await self.hub.chargecontroller.savings.async_add_consumption(float_value)
 
         if self.hub.options.price.price_aware and not self.hub.options.peaqev_lite:  # todo: strategy should handle this
             try:

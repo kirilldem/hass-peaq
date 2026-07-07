@@ -17,8 +17,8 @@ from custom_components.peaqev.configflow.config_flow_schemas import (
     OUTLET_DETAILS_SCHEMA, PRICEAWARE_HOURS_SCHEMA, PRICEAWARE_SCHEMA,
     SIMULATION_SCHEMA,
     SENSOR_SCHEMA, TARIFF_SCHEMA, TYPE_SCHEMA)
-from custom_components.peaqev.configflow.config_flow_validation import \
-    ConfigFlowValidation
+from custom_components.peaqev.configflow.config_flow_validation import (
+    ConfigFlowValidation, FaultyPriceSensor)
 from custom_components.peaqev.peaqservice.powertools.power_canary.const import \
     FUSES_LIST
 from custom_components.peaqev.peaqservice.tariff.goteborg_energi import \
@@ -119,10 +119,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_priceaware(self, user_input=None):
         errors = {}
         if user_input is not None:
-            try:
-                await ConfigFlowValidation.validate_price_sensor(self.hass, user_input.get('custom_price_sensor', None))
-            except ValueError:
-                errors['base'] = 'invalid_pricesensor'
+            _custom_sensor = user_input.get('custom_price_sensor', None)
+            if _custom_sensor and len(_custom_sensor) > 2:
+                try:
+                    await ConfigFlowValidation.validate_price_sensor(self.hass, _custom_sensor)
+                except (ValueError, FaultyPriceSensor) as e:
+                    _LOGGER.debug('Price sensor validation failed: %s', e)
+                    errors['base'] = 'invalid_pricesensor'
+            else:
+                user_input['custom_price_sensor'] = ''
             if not errors:
                 self.data.update(user_input)
                 if self.data['priceaware'] is False:
@@ -242,7 +247,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # In HA 2025.x+, config_entry is a read-only property on OptionsFlow.
+        # Do NOT assign it via self.config_entry = config_entry.
         self.options = dict(config_entry.options)
 
     async def _get_existing_param(self, parameter: str, default_val: any):
@@ -259,7 +265,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if len(user_input['custom_price_sensor']) > 2:
                 try:
                     await ConfigFlowValidation.validate_price_sensor(self.hass, user_input['custom_price_sensor'])
-                except ValueError:
+                except (ValueError, FaultyPriceSensor) as e:
+                    _LOGGER.debug('Price sensor validation failed: %s', e)
                     errors['base'] = 'invalid_pricesensor'
             else:
                 _LOGGER.info('Nulling Custom price sensor')
@@ -407,7 +414,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         _ge_enabled = await self._get_existing_param('ge_tariff_enabled', False)
         _ge_sensor = await self._get_existing_param('ge_tariff_sensor', DEFAULT_GE_SENSOR)
         _ge_fallback = await self._get_existing_param('ge_tariff_fallback', True)
-        _ge_peak = await self._get_existing_param('ge_tariff_peak_threshold', 0)
 
         return self.async_show_form(
             step_id='tariff',
@@ -417,7 +423,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional('ge_tariff_enabled', default=_ge_enabled):     cv.boolean,
                     vol.Optional('ge_tariff_sensor', default=_ge_sensor):       cv.string,
                     vol.Optional('ge_tariff_fallback', default=_ge_fallback):   cv.boolean,
-                    vol.Optional('ge_tariff_peak_threshold', default=_ge_peak): cv.positive_float,
                 }
             ),
         )
@@ -429,7 +434,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_departure_scheduling()
 
         _iv_enabled = await self._get_existing_param('interval_planning_enabled', False)
-        _iv_peak = await self._get_existing_param('interval_peak_threshold', 0)
 
         return self.async_show_form(
             step_id='interval_planning',
@@ -437,7 +441,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional('interval_planning_enabled', default=_iv_enabled): cv.boolean,
-                    vol.Optional('interval_peak_threshold', default=_iv_peak):     cv.positive_float,
                 }
             ),
         )

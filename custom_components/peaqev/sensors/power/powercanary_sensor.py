@@ -31,7 +31,7 @@ class PowerCanaryDevice(SensorEntity):
         return {
             "identifiers": {(DOMAIN, self.hub.hub_id, POWERCANARY)},
             "name": f"{DOMAIN} {POWERCANARY}",
-            "sw_version": 1,
+            "sw_version": "1",
             "model": f"{self.hub.power.power_canary.fuse}",  # todo: composition
             "manufacturer": "Peaq systems",
         }

@@ -88,12 +88,10 @@ class IntervalPlanner:
         hub: HomeAssistantHub,
         tariff: GoteborgEnergiTariff | None = None,
         enabled: bool = False,
-        peak_threshold_w: float = 0.0,
     ):
         self.hub = hub
         self.tariff = tariff
         self._enabled = enabled
-        self._peak_threshold_w = peak_threshold_w
         self._household_avg_w = 0.0  # rolling average power (watts)
         self._current_peak_w = 0.0  # current monthly peak (watts)
 
@@ -104,14 +102,6 @@ class IntervalPlanner:
     @enabled.setter
     def enabled(self, value: bool):
         self._enabled = bool(value)
-
-    @property
-    def peak_threshold_w(self) -> float:
-        return self._peak_threshold_w
-
-    @peak_threshold_w.setter
-    def peak_threshold_w(self, value: float):
-        self._peak_threshold_w = float(value)
 
     def update_household_avg(self, avg_w: float) -> None:
         """Update the rolling average household power draw (watts)."""
@@ -156,11 +146,19 @@ class IntervalPlanner:
     def _is_peak_safe(self, slot: IntervalSlot, charging_w: float) -> bool:
         """Check whether charging during this slot risks exceeding peak threshold.
 
-        The key risk: if we charge at the start of the hour (:00–:15), the
-        household still has 45 minutes of consumption we cannot predict.  We
-        use the rolling average to estimate the worst-case hourly peak.
+        Uses the hub's current monthly peak threshold (from the Months config step)
+        converted to watts. If no peak threshold is set, returns True.
         """
-        if self._peak_threshold_w <= 0:
+        peak_threshold_w = 0.0
+        try:
+            # The hub's current_peak is in kW — convert to W
+            peak_kw = float(self.hub.sensors.current_peak.observed_peak)
+            if isinstance(peak_kw, (list, tuple)):
+                peak_kw = max(peak_kw) if peak_kw else 0.0
+            peak_threshold_w = peak_kw * 1000
+        except Exception:
+            pass
+        if peak_threshold_w <= 0:
             return True  # no threshold configured
         projected_hourly_peak = self._household_avg_w + charging_w
         # If slot is in the first 15 minutes of the hour, add a safety margin

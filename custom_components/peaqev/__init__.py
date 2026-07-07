@@ -169,12 +169,10 @@ async def async_set_options(conf) -> HubOptions:
     options.tariff.enabled = await async_get_existing_param(conf, 'ge_tariff_enabled', False)
     options.tariff.sensor_entity = await async_get_existing_param(conf, 'ge_tariff_sensor', '')
     options.tariff.enable_fallback = await async_get_existing_param(conf, 'ge_tariff_fallback', True)
-    options.tariff.peak_threshold_w = await async_get_existing_param(conf, 'ge_tariff_peak_threshold', 0)
-
+    
     # 15-minute interval planning options
     options.interval_planning.enabled = await async_get_existing_param(conf, 'interval_planning_enabled', False)
-    options.interval_planning.peak_threshold_w = await async_get_existing_param(conf, 'interval_peak_threshold', 0)
-
+    
     # Departure scheduling options
     options.departure_scheduling.volvo_soc_sensor = await async_get_existing_param(conf, 'volvo_soc_sensor', '')
     options.departure_scheduling.charger_efficiency = await async_get_existing_param(conf, 'charger_efficiency', 0.9)

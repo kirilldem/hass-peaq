@@ -17,10 +17,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-
 class ServiceCalls(Enum):
-    ENABLE = 'enable'
-    DISABLE = 'disable'
     OVERRIDE_NONHOURS = 'override_nonhours'
     SCHEDULER_SET = 'scheduler_set'
     SCHEDULER_CANCEL = 'scheduler_cancel'
@@ -30,20 +27,12 @@ class ServiceCalls(Enum):
 
 
 async def async_prepare_register_services(hub: HomeAssistantHub, hass: HomeAssistant) -> None:
-    async def async_servicehandler_enable(call: ServiceCall):  # pylint:disable=unused-argument
-        _LOGGER.info('Calling {} service'.format(ServiceCalls.ENABLE.value))
-        await hub.servicecalls.async_call_enable_peaq()
-
-    async def async_servicehandler_disable(call: ServiceCall):  # pylint:disable=unused-argument
-        _LOGGER.info('Calling {} service'.format(ServiceCalls.DISABLE.value))
-        await hub.servicecalls.async_call_disable_peaq()
-
-    async def async_servicehandler_override_nonhours(call: ServiceCall):  # pylint:disable=unused-argument
+    async def async_servicehandler_override_nonhours(call: ServiceCall):
         hours = call.data.get('hours')
         _LOGGER.info('Calling {} service'.format(ServiceCalls.OVERRIDE_NONHOURS.value))
         await hub.servicecalls.async_call_override_nonhours(1 if hours is None else hours)
 
-    async def async_servicehandler_scheduler_set(call: ServiceCall):  # pylint:disable=unused-argument
+    async def async_servicehandler_scheduler_set(call: ServiceCall):
         charge_amount = call.data.get('charge_amount')
         departure_time = call.data.get('departure_time')
         schedule_starttime = call.data.get('schedule_starttime')
@@ -91,7 +80,6 @@ async def async_prepare_register_services(hub: HomeAssistantHub, hass: HomeAssis
 
         _import_dict_decorated = {'m': datetime.now().month, 'p': _import_dict}
 
-        """Update the peaks history"""
         now_key = f'{datetime.now().year}_{datetime.now().month}'
         current_history = hub.sensors.current_peak.history
         current_history[now_key] = list(_import_dict.values())
@@ -100,14 +88,11 @@ async def async_prepare_register_services(hub: HomeAssistantHub, hass: HomeAssis
         _result = hub.sensors.current_peak.import_from_service(current_history)
         return {'result': 'success', 'message': 'Imported successfully', 'history-update': _result}
 
-    # Register services
     SERVICES = {
-        ServiceCalls.ENABLE: async_servicehandler_enable,
-        ServiceCalls.DISABLE: async_servicehandler_disable,
         ServiceCalls.OVERRIDE_NONHOURS: async_servicehandler_override_nonhours,
         ServiceCalls.SCHEDULER_SET: async_servicehandler_scheduler_set,
         ServiceCalls.SCHEDULER_CANCEL: async_servicehandler_scheduler_cancel,
-        ServiceCalls.OVERRIDE_CHARGE_AMOUNT: async_servicehandler_override_charge_amount
+        ServiceCalls.OVERRIDE_CHARGE_AMOUNT: async_servicehandler_override_charge_amount,
     }
 
     for service, handler in SERVICES.items():
@@ -115,7 +100,6 @@ async def async_prepare_register_services(hub: HomeAssistantHub, hass: HomeAssis
     hass.services.async_register(DOMAIN, ServiceCalls.UPDATE_PEAKS_HISTORY.value, async_servicehandler_update_peaks_history, supports_response=SupportsResponse.ONLY)
     hass.services.async_register(DOMAIN, ServiceCalls.UPDATE_CURRENT_PEAK.value,
                                  async_servicehandler_update_current_peaks, supports_response=SupportsResponse.ONLY)
-
 
     def validate_import_dictionary(import_dict: dict, max_len: int) -> dict:
         ret = {'result': 'success', 'errors': ''}

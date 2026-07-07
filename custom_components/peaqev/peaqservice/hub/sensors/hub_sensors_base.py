@@ -54,7 +54,7 @@ class HubSensorsBase:
                 HubMember,
                 data_type=bool,
                 listenerentity=f'switch.{domain}_{nametoid(CHARGERENABLED)}',
-                initval=False,
+                initval=True,
             ),
             CURRENTPEAK_SENSOR: partial(
                 CurrentPeak, data_type=float, initval=0, startpeaks=options.startpeaks, locale=self.locale, options_use_history=options.use_peak_history

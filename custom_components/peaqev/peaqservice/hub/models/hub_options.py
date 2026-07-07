@@ -34,14 +34,12 @@ class Tariff(OptionsComparer):
     enabled: bool = False
     sensor_entity: str = ''
     enable_fallback: bool = True
-    peak_threshold_w: float = 0.0
 
 
 @dataclass
 class IntervalPlanning(OptionsComparer):
     """15-minute interval planning options."""
     enabled: bool = False
-    peak_threshold_w: float = 0.0
 
 
 @dataclass

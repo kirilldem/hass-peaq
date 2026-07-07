@@ -106,14 +106,12 @@ TARIFF_SCHEMA = vol.Schema(
         vol.Optional('ge_tariff_enabled', default=False): cv.boolean,
         vol.Optional('ge_tariff_sensor', default=''): cv.string,
         vol.Optional('ge_tariff_fallback', default=True): cv.boolean,
-        vol.Optional('ge_tariff_peak_threshold', default=0): cv.positive_float,
     }
 )
 
 INTERVAL_PLANNING_SCHEMA = vol.Schema(
     {
         vol.Optional('interval_planning_enabled', default=False): cv.boolean,
-        vol.Optional('interval_peak_threshold', default=0): cv.positive_float,
     }
 )
 

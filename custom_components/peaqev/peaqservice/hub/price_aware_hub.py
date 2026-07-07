@@ -44,7 +44,6 @@ class PriceAwareHub(HomeAssistantHub):
                 hub=self,
                 tariff=self._tariff,
                 enabled=True,
-                peak_threshold_w=options.interval_planning.peak_threshold_w,
             )
 
         if self._interval_planner is not None:

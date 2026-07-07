@@ -1,8 +1,4 @@
 
-enable:
-
-disable:
-
 override_nonhours:
   fields:
     hours:

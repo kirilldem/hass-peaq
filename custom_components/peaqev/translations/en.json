@@ -64,16 +64,14 @@
         "data": {
           "ge_tariff_enabled": "Enable Goteborg Energi tariff awareness",
           "ge_tariff_sensor": "HA binary sensor for high-tariff active",
-          "ge_tariff_fallback": "Enable fallback time-based calculation",
-          "ge_tariff_peak_threshold": "Peak power threshold (W) for tariff-safe charging"
+          "ge_tariff_fallback": "Enable fallback time-based calculation"
         }
       },
       "interval_planning": {
         "title": "15-Minute Interval Planning",
         "description": "Enable sub-hourly 15-minute settlement interval planning.",
         "data": {
-          "interval_planning_enabled": "Enable 15-minute interval planning",
-          "interval_peak_threshold": "Peak power threshold (W) for interval-safe charging"
+          "interval_planning_enabled": "Enable 15-minute interval planning"
         }
       },
       "departure_scheduling": {
@@ -176,16 +174,14 @@
         "data": {
           "ge_tariff_enabled": "Enable Goteborg Energi tariff awareness",
           "ge_tariff_sensor": "HA binary sensor for high-tariff active",
-          "ge_tariff_fallback": "Enable fallback time-based calculation",
-          "ge_tariff_peak_threshold": "Peak power threshold (W) for tariff-safe charging"
+          "ge_tariff_fallback": "Enable fallback time-based calculation"
         }
       },
       "interval_planning": {
         "title": "15-Minute Interval Planning",
         "description": "Enable sub-hourly 15-minute settlement interval planning.",
         "data": {
-          "interval_planning_enabled": "Enable 15-minute interval planning",
-          "interval_peak_threshold": "Peak power threshold (W) for interval-safe charging"
+          "interval_planning_enabled": "Enable 15-minute interval planning"
         }
       },
       "departure_scheduling": {
@@ -217,14 +213,6 @@
     }
   },
   "services": {
-    "enable": {
-      "name": "Enable Peaqev",
-      "description": "Enables Peaqev smart charging."
-    },
-    "disable": {
-      "name": "Disable Peaqev",
-      "description": "Disables Peaqev smart charging."
-    },
     "override_nonhours": {
       "name": "Enable Peaqev",
       "description": "Will override non-hours for the set amount of hours. Default per call is to add one hour. Note that this service will not keep state on reboot.",

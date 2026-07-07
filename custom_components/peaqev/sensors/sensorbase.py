@@ -28,7 +28,7 @@ class MoneyDevice(SensorEntity):
         return {
             "identifiers": {(DOMAIN, self.hub.hub_id, MONEYCONTROLS)},
             "name": f"{DOMAIN} {MONEYCONTROLS}",
-            "sw_version": 1,
+            "sw_version": "1",
             "manufacturer": "Peaq systems",
         }
 
@@ -52,7 +52,7 @@ class PowerDevice(SensorEntity):
         return {
             "identifiers": {(DOMAIN, self.hub.hub_id, POWERCONTROLS)},
             "name": f"{DOMAIN} {POWERCONTROLS}",
-            "sw_version": 1,
+            "sw_version": "1",
             "manufacturer": "Peaq systems",
         }
 
@@ -77,7 +77,7 @@ class SensorBase(SensorEntity):
         return {
             "identifiers": {(DOMAIN, self.hub.hub_id)},
             "name": f"{DOMAIN} {HUB}",
-            "sw_version": 1,
+            "sw_version": "1",
             "model": f"{self.hub.sensors.locale.type} ({self.hub.chargertype.type.value})",  # todo: composition
             "manufacturer": "Peaq systems",
         }

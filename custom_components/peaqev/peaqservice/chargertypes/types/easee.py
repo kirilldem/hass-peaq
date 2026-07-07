@@ -140,6 +140,8 @@ class Easee(IChargerType):
         self.entities.powerswitch = f"switch.{self.entities.entityschema}_is_enabled"
         self.entities.ampmeter = amp_sensor
 
+    _amps_warning_last_logged = 0
+
     def get_allowed_amps(self) -> int:
         entity = self.entities.maxamps.split("|")
         state = self._hass.states.get(entity[0])
@@ -150,10 +152,20 @@ class Easee(IChargerType):
                 _LOGGER.info(f"Got max amps from Easee. Setting {retattr}A.")
                 ret = int(retattr)
                 self._easee_max_amps = ret
+            else:
+                import time as _time
+                if _time.time() - Easee._amps_warning_last_logged > 60:
+                    _LOGGER.warning(
+                        f"Unable to get max amps attribute from {self.entities.maxamps}. Setting max amps to 16."
+                    )
+                    Easee._amps_warning_last_logged = _time.time()
         else:
-            _LOGGER.warning(
-                f"Unable to get max amps. The sensor {self.entities.maxamps} returned state {ret}. Setting max amps to 16 til I get a proper state."
-            )
+            import time as _time
+            if _time.time() - Easee._amps_warning_last_logged > 60:
+                _LOGGER.warning(
+                    f"Unable to get max amps. The sensor {self.entities.maxamps} is not available. Setting max amps to 16 til I get a proper state."
+                )
+                Easee._amps_warning_last_logged = _time.time()
         return ret
 
     async def async_validate_sensor(self, sensor: str) -> bool:

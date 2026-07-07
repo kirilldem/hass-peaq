@@ -32,7 +32,7 @@ class SessionDevice(SensorEntity):
         return {
             "identifiers": {(DOMAIN, self.hub.hub_id, SESSION)},
             "name": f"{DOMAIN} {SESSION}",
-            "sw_version": 1,
+            "sw_version": "1",
             "manufacturer": "Peaq systems",
         }
 

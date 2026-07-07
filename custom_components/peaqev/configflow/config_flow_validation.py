@@ -15,22 +15,38 @@ class ConfigFlowValidation:
         if val_state is None:
             _LOGGER.error(f'Could not validate chosen powersensor {_powersensor}. It returned None as state.')
             raise FaultyPowerSensor
-        elif not isinstance(float(val_state.state), float):
+        try:
+            float(val_state.state)
+        except (ValueError, TypeError):
             _LOGGER.error(
                 f'Could not validate chosen powersensor {_powersensor}. The value of its state is not a number. {val_state.state}'
             )
             raise FaultyPowerSensor
 
     @staticmethod
-    async def validate_price_sensor(hass: HomeAssistant, pricesensor:str|None):
+    async def validate_price_sensor(hass: HomeAssistant, pricesensor: str | None, skip_attribute_check: bool = False):
+        """Validate a custom price sensor.
+
+        Args:
+            hass: Home Assistant instance.
+            pricesensor: Entity ID of the price sensor, or None.
+            skip_attribute_check: When True, skip the Nordpool-style attribute
+                validation (today/tomorrow_valid/currency). Used in simulation
+                mode where dummy sensors don't have these attributes.
+        """
         if pricesensor is None:
             return
         _pricesensor = f'sensor.{pricesensor}' if not pricesensor.startswith('sensor.') else pricesensor
         val_state = hass.states.get(_pricesensor)
         if val_state is None:
-            raise FaultyPowerSensor('It returned None as state.')
-        if not isinstance(float(val_state.state), float):
+            raise FaultyPriceSensor('It returned None as state.')
+        try:
+            float(val_state.state)
+        except (ValueError, TypeError):
             raise FaultyPriceSensor(f'Value of state is not a number. {val_state.state}')
+        if skip_attribute_check:
+            _LOGGER.info('Skipping price sensor attribute validation (simulation mode).')
+            return
         try:
             ConfigFlowValidation.validate_price_sensor_attributes(val_state.attributes)
         except Exception as e:
@@ -56,9 +72,6 @@ class ConfigFlowValidation:
     @staticmethod
     async def validate_input_first_chargerid(data: dict) -> dict[str, Any]:
         """Validate the chargerId"""
-        # if len(data["chargerid"]) < 1:
-        #    raise ValueError
-
         return {'title': data['name']}
 
 
