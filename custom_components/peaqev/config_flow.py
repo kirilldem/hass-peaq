@@ -12,13 +12,16 @@ from homeassistant.core import callback
 from custom_components.peaqev.configflow.config_flow_helpers import \
     async_set_startpeak_dict
 from custom_components.peaqev.configflow.config_flow_schemas import (
-    CHARGER_DETAILS_SCHEMA, CHARGER_SCHEMA, HOURS_SCHEMA, MONTHS_SCHEMA,
+    CHARGER_DETAILS_SCHEMA, CHARGER_SCHEMA, DEPARTURE_SCHEDULING_SCHEMA,
+    HOURS_SCHEMA, INTERVAL_PLANNING_SCHEMA, MONTHS_SCHEMA,
     OUTLET_DETAILS_SCHEMA, PRICEAWARE_HOURS_SCHEMA, PRICEAWARE_SCHEMA,
-    SENSOR_SCHEMA, TYPE_SCHEMA)
+    SENSOR_SCHEMA, TARIFF_SCHEMA, TYPE_SCHEMA)
 from custom_components.peaqev.configflow.config_flow_validation import \
     ConfigFlowValidation
 from custom_components.peaqev.peaqservice.powertools.power_canary.const import \
     FUSES_LIST
+from custom_components.peaqev.peaqservice.tariff.goteborg_energi import \
+    DEFAULT_SENSOR as DEFAULT_GE_SENSOR
 from custom_components.peaqev.peaqservice.util.constants import (
     CAUTIONHOURTYPE_NAMES, SPOTPRICE_VALUETYPES, TYPELITE, CautionHourType)
 
@@ -30,7 +33,6 @@ _LOGGER = logging.getLogger(__name__)
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
     OPTIONS = 'options'
     data: Optional[dict[str, Any]]
     info: Optional[dict[str, Any]]
@@ -160,11 +162,47 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             months_dict = await async_set_startpeak_dict(user_input)
             self.data['startpeaks'] = months_dict
             self.data['use_peak_history'] = user_input.get('use_peak_history', False)
-            return await self.async_step_misc()
+            return await self.async_step_tariff()
 
         return self.async_show_form(
             step_id='months',
             data_schema=MONTHS_SCHEMA,
+            last_step=False,
+        )
+
+    async def async_step_tariff(self, user_input=None):
+        """Göteborg Energi tariff settings"""
+        if user_input is not None:
+            self.data.update(user_input)
+            return await self.async_step_interval_planning()
+
+        return self.async_show_form(
+            step_id='tariff',
+            data_schema=TARIFF_SCHEMA,
+            last_step=False,
+        )
+
+    async def async_step_interval_planning(self, user_input=None):
+        """15-minute interval planning settings"""
+        if user_input is not None:
+            self.data.update(user_input)
+            return await self.async_step_departure_scheduling()
+
+        return self.async_show_form(
+            step_id='interval_planning',
+            data_schema=INTERVAL_PLANNING_SCHEMA,
+            last_step=False,
+        )
+
+    async def async_step_departure_scheduling(self, user_input=None):
+        """Departure scheduling settings"""
+        if user_input is not None:
+            self.data.update(user_input)
+            return await self.async_step_misc()
+
+        return self.async_show_form(
+            step_id='departure_scheduling',
+            data_schema=DEPARTURE_SCHEDULING_SCHEMA,
             last_step=False,
         )
 
@@ -319,7 +357,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self.options['use_peak_history'] = user_input.get('use_peak_history', False)
             self.options['startpeaks'] = months_dict
 
-            return await self.async_step_misc()
+            return await self.async_step_tariff()
 
         _defaultvalues = self.config_entry.options.get('startpeaks', self.config_entry.data.get('startpeaks'))
         _default_history = await self._get_existing_param('use_peak_history', False)
@@ -343,6 +381,72 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional('nov', default=defaultvalues[11]):             cv.positive_float,
                     vol.Optional('dec', default=defaultvalues[12]):             cv.positive_float,
                     vol.Optional('use_peak_history', default=_default_history): cv.boolean,
+                }
+            ),
+        )
+
+    async def async_step_tariff(self, user_input=None):
+        """Göteborg Energi tariff options"""
+        if user_input is not None:
+            self.options.update(user_input)
+            return await self.async_step_interval_planning()
+
+        _ge_enabled = await self._get_existing_param('ge_tariff_enabled', False)
+        _ge_sensor = await self._get_existing_param('ge_tariff_sensor', DEFAULT_GE_SENSOR)
+        _ge_fallback = await self._get_existing_param('ge_tariff_fallback', True)
+        _ge_peak = await self._get_existing_param('ge_tariff_peak_threshold', 0)
+
+        return self.async_show_form(
+            step_id='tariff',
+            last_step=False,
+            data_schema=vol.Schema(
+                {
+                    vol.Optional('ge_tariff_enabled', default=_ge_enabled):     cv.boolean,
+                    vol.Optional('ge_tariff_sensor', default=_ge_sensor):       cv.string,
+                    vol.Optional('ge_tariff_fallback', default=_ge_fallback):   cv.boolean,
+                    vol.Optional('ge_tariff_peak_threshold', default=_ge_peak): cv.positive_float,
+                }
+            ),
+        )
+
+    async def async_step_interval_planning(self, user_input=None):
+        """15-minute interval planning options"""
+        if user_input is not None:
+            self.options.update(user_input)
+            return await self.async_step_departure_scheduling()
+
+        _iv_enabled = await self._get_existing_param('interval_planning_enabled', False)
+        _iv_peak = await self._get_existing_param('interval_peak_threshold', 0)
+
+        return self.async_show_form(
+            step_id='interval_planning',
+            last_step=False,
+            data_schema=vol.Schema(
+                {
+                    vol.Optional('interval_planning_enabled', default=_iv_enabled): cv.boolean,
+                    vol.Optional('interval_peak_threshold', default=_iv_peak):     cv.positive_float,
+                }
+            ),
+        )
+
+    async def async_step_departure_scheduling(self, user_input=None):
+        """Departure scheduling options"""
+        if user_input is not None:
+            self.options.update(user_input)
+            return await self.async_step_misc()
+
+        _volvo_sensor = await self._get_existing_param('volvo_soc_sensor', '')
+        _efficiency = await self._get_existing_param('charger_efficiency', 0.9)
+
+        return self.async_show_form(
+            step_id='departure_scheduling',
+            last_step=False,
+            data_schema=vol.Schema(
+                {
+                    vol.Optional('volvo_soc_sensor', default=_volvo_sensor): cv.string,
+                    vol.Optional('charger_efficiency', default=_efficiency): vol.All(
+                        vol.Coerce(float), vol.Range(min=0.5, max=1.0)
+                    ),
                 }
             ),
         )

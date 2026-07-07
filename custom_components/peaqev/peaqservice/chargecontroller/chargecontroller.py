@@ -10,7 +10,7 @@ from peaqevcore.common.wait_timer import WaitTimer
 from peaqevcore.models.chargecontroller_states import ChargeControllerStates
 
 from custom_components.peaqev.peaqservice.chargecontroller.chargecontroller_helpers import \
-    defer_start
+    defer_start, should_defer_for_tariff, should_defer_for_interval
 from custom_components.peaqev.peaqservice.chargecontroller.const import (
     INITIALIZING, WAITING_FOR_POWER)
 from custom_components.peaqev.peaqservice.chargecontroller.ichargecontroller import \
@@ -144,6 +144,13 @@ class ChargeController(IChargeController):
         is_free_charge = await self.hub.async_free_charge()
         is_below_treshold = await self.async_below_startthreshold()
         energy_has_value = self.hub.sensors.totalhourlyenergy.value != 0
+        tariff_defer = should_defer_for_tariff(self.hub)
+        interval_defer = should_defer_for_interval(self.hub)
+
+        departure_scheduler = getattr(self.hub, 'departure_scheduler', None)
+        scheduler_wants_charge = True
+        if departure_scheduler is not None and departure_scheduler.active_schedule is not None:
+            scheduler_wants_charge = departure_scheduler.should_charge_now()
 
         return all([
             any([
@@ -151,5 +158,8 @@ class ChargeController(IChargeController):
                 is_free_charge
             ]),
             any([dont_defer_nonhour, timer_is_override]),
-            not aux_stop
+            not aux_stop,
+            not tariff_defer,
+            not interval_defer,
+            scheduler_wants_charge,
         ])

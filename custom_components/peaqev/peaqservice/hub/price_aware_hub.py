@@ -11,6 +11,12 @@ from custom_components.peaqev.peaqservice.hub.models.hub_options import \
     HubOptions
 from custom_components.peaqev.peaqservice.hub.observer.iobserver_coordinator import \
     IObserver
+from custom_components.peaqev.peaqservice.tariff.departure_scheduler import \
+    DepartureScheduler
+from custom_components.peaqev.peaqservice.tariff.goteborg_energi import \
+    GoteborgEnergiTariff
+from custom_components.peaqev.peaqservice.tariff.interval_planner import \
+    IntervalPlanner
 from custom_components.peaqev.peaqservice.util.schedule_options_handler import \
     SchedulerOptionsHandler
 
@@ -21,6 +27,46 @@ class PriceAwareHub(HomeAssistantHub):
         super().__init__(hass, options, domain, observer)
         self.max_min_controller = MaxMinController(self)
         self._scheduler_options_handler = SchedulerOptionsHandler(self)
+
+        self._tariff: GoteborgEnergiTariff | None = None
+        self._interval_planner: IntervalPlanner | None = None
+        self._departure_scheduler: DepartureScheduler | None = None
+
+        if options.tariff.enabled:
+            self._tariff = GoteborgEnergiTariff(
+                hass=hass,
+                sensor_entity=options.tariff.sensor_entity or None,
+                enable_fallback=options.tariff.enable_fallback,
+            )
+
+        if options.interval_planning.enabled:
+            self._interval_planner = IntervalPlanner(
+                hub=self,
+                tariff=self._tariff,
+                enabled=True,
+                peak_threshold_w=options.interval_planning.peak_threshold_w,
+            )
+
+        if self._interval_planner is not None:
+            self._departure_scheduler = DepartureScheduler(
+                hub=self,
+                interval_planner=self._interval_planner,
+                tariff=self._tariff,
+                volvo_soc_sensor=options.departure_scheduling.volvo_soc_sensor or None,
+                charger_efficiency=options.departure_scheduling.charger_efficiency,
+            )
+
+    @property
+    def tariff(self) -> GoteborgEnergiTariff | None:
+        return self._tariff
+
+    @property
+    def interval_planner(self) -> IntervalPlanner | None:
+        return self._interval_planner
+
+    @property
+    def departure_scheduler(self) -> DepartureScheduler | None:
+        return self._departure_scheduler
 
     @property
     def scheduler_options_handler(self) -> SchedulerOptionsHandler:

@@ -101,10 +101,38 @@ MONTHS_SCHEMA = vol.Schema(
     }
 )
 
+TARIFF_SCHEMA = vol.Schema(
+    {
+        vol.Optional('ge_tariff_enabled', default=False): cv.boolean,
+        vol.Optional('ge_tariff_sensor', default=''): cv.string,
+        vol.Optional('ge_tariff_fallback', default=True): cv.boolean,
+        vol.Optional('ge_tariff_peak_threshold', default=0): cv.positive_float,
+    }
+)
+
+INTERVAL_PLANNING_SCHEMA = vol.Schema(
+    {
+        vol.Optional('interval_planning_enabled', default=False): cv.boolean,
+        vol.Optional('interval_peak_threshold', default=0): cv.positive_float,
+    }
+)
+
+DEPARTURE_SCHEDULING_SCHEMA = vol.Schema(
+    {
+        vol.Optional('volvo_soc_sensor', default=''): cv.string,
+        vol.Optional('charger_efficiency', default=0.9): vol.All(
+            vol.Coerce(float), vol.Range(min=0.5, max=1.0)
+        ),
+    }
+)
+
 SCHEMAS = [
     SENSOR_SCHEMA,
     CHARGER_SCHEMA,
     HOURS_SCHEMA,
     PRICEAWARE_SCHEMA,
     MONTHS_SCHEMA,
+    TARIFF_SCHEMA,
+    INTERVAL_PLANNING_SCHEMA,
+    DEPARTURE_SCHEDULING_SCHEMA,
 ]

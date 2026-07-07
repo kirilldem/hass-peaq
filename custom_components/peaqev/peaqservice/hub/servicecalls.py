@@ -63,24 +63,55 @@ class ServiceCalls:
             _LOGGER.debug(
                 f'scheduler params. charge: {charge_amount}, dep-time: {dep_time}, start_time: {start_time}'
             )
-            if self.hub.hours.scheduler.scheduler_active:
-                _LOGGER.debug('Scheduler already active, cancelling before adding new.')
-                await self.hub.hours.scheduler.async_cancel_facade()
-            await self.hub.hours.scheduler.async_create_schedule(
-                charge_amount, dep_time, start_time, override_settings
-            )
-            dto = UpdateSchedulerDTO(
-                moving_avg24=self.hub.sensors.powersensormovingaverage24.value,
-                peak=self.hub.current_peak_dynamic,
-                charged_amount=self.hub.chargecontroller.session.session_energy,
-                prices=self.hub.hours.prices,
-                prices_tomorrow=self.hub.hours.prices_tomorrow,
-                chargecontroller_state = self.hub.chargecontroller.status_type
-            )
-            await self.hub.hours.scheduler.async_update_facade(dto)
+
+            # Use the new 15-minute departure scheduler when available
+            departure_scheduler = getattr(self.hub, 'departure_scheduler', None)
+            if departure_scheduler is not None:
+                _LOGGER.info('Using 15-minute departure scheduler.')
+                departure_scheduler.create_schedule(
+                    charge_amount_kwh=charge_amount,
+                    departure_time=dep_time,
+                    start_time=start_time,
+                    override_settings=override_settings,
+                )
+                # Also update the core scheduler for backward compatibility
+                if self.hub.hours.scheduler.scheduler_active:
+                    await self.hub.hours.scheduler.async_cancel_facade()
+                await self.hub.hours.scheduler.async_create_schedule(
+                    charge_amount, dep_time, start_time, override_settings
+                )
+                dto = UpdateSchedulerDTO(
+                    moving_avg24=self.hub.sensors.powersensormovingaverage24.value,
+                    peak=self.hub.current_peak_dynamic,
+                    charged_amount=self.hub.chargecontroller.session.session_energy,
+                    prices=self.hub.hours.prices,
+                    prices_tomorrow=self.hub.hours.prices_tomorrow,
+                    chargecontroller_state=self.hub.chargecontroller.status_type,
+                )
+                await self.hub.hours.scheduler.async_update_facade(dto)
+            else:
+                # Fall back to original hourly scheduler
+                if self.hub.hours.scheduler.scheduler_active:
+                    _LOGGER.debug('Scheduler already active, cancelling before adding new.')
+                    await self.hub.hours.scheduler.async_cancel_facade()
+                await self.hub.hours.scheduler.async_create_schedule(
+                    charge_amount, dep_time, start_time, override_settings
+                )
+                dto = UpdateSchedulerDTO(
+                    moving_avg24=self.hub.sensors.powersensormovingaverage24.value,
+                    peak=self.hub.current_peak_dynamic,
+                    charged_amount=self.hub.chargecontroller.session.session_energy,
+                    prices=self.hub.hours.prices,
+                    prices_tomorrow=self.hub.hours.prices_tomorrow,
+                    chargecontroller_state=self.hub.chargecontroller.status_type,
+                )
+                await self.hub.hours.scheduler.async_update_facade(dto)
             await self.observer.async_broadcast(ObserverTypes.SchedulerCreated)
 
     async def async_call_scheduler_cancel(self):
         if self.hub.hours.price_aware:
+            departure_scheduler = getattr(self.hub, 'departure_scheduler', None)
+            if departure_scheduler is not None:
+                departure_scheduler.cancel_schedule()
             await self.hub.hours.scheduler.async_cancel_facade()
             await self.observer.async_broadcast(ObserverTypes.SchedulerCancelled)

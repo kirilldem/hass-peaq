@@ -27,10 +27,36 @@ class Charger(OptionsComparer):
 
 
 @dataclass
+class Tariff(OptionsComparer):
+    """Göteborg Energi power tariff options."""
+    enabled: bool = False
+    sensor_entity: str = ''
+    enable_fallback: bool = True
+    peak_threshold_w: float = 0.0
+
+
+@dataclass
+class IntervalPlanning(OptionsComparer):
+    """15-minute interval planning options."""
+    enabled: bool = False
+    peak_threshold_w: float = 0.0
+
+
+@dataclass
+class DepartureScheduling(OptionsComparer):
+    """Departure scheduling options."""
+    volvo_soc_sensor: str = ''
+    charger_efficiency: float = 0.9
+
+
+@dataclass
 class HubOptions:
     locale: str = field(init=False)
     charger: Charger = field(init=False)
     price: Price = field(init=False)
+    tariff: Tariff = field(init=False)
+    interval_planning: IntervalPlanning = field(init=False)
+    departure_scheduling: DepartureScheduling = field(init=False)
     peaqev_lite: bool = False
     powersensor_includes_car: bool = False
     powersensor: str = field(init=False)
@@ -45,6 +71,9 @@ class HubOptions:
     def __post_init__(self):
         self.charger = Charger()
         self.price = Price()
+        self.tariff = Tariff()
+        self.interval_planning = IntervalPlanning()
+        self.departure_scheduling = DepartureScheduling()
 
     @property
     def startpeaks(self):
@@ -58,7 +87,7 @@ class HubOptions:
         for key, value in self.__dict__.items():
             if key not in other.__dict__.keys():
                 diff.append(key)
-            elif key in ['charger', 'price']:
+            elif key in ['charger', 'price', 'tariff', 'interval_planning', 'departure_scheduling']:
                 diff.extend(value.compare(other=other.__dict__[key]))
             elif value != other.__dict__[key]:
                 diff.append(key)

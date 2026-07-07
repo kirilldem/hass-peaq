@@ -14,15 +14,20 @@ scheduler_set:
     charge_amount:
       required: true
       example: 7.2
+      description: "Amount of energy to charge (kWh) before departure time."
     departure_time:
       required: true
-      example: 2022-06-02 07:00
+      example: "2025-01-15 07:00"
+      description: "Target departure time. Charging will be scheduled in the cheapest 15-minute slots before this time."
     schedule_starttime:
-      example: 2022-06-01 18:00
+      example: "2025-01-14 18:00"
+      description: "Optional start time for the schedule. Defaults to now."
     override_settings:
-      example: False
+      example: false
+      description: "If true, overrides normal non-hour and price-aware settings."
 
 scheduler_cancel:
+  description: "Cancel any active charging schedule."
 
 override_charge_amount:
   fields:
@@ -41,4 +46,3 @@ update_current_peaks:
     import_dictionary:
       required: true
       example: "{'1h17': 2.35, '26h21': 2.29, '29h2': 3.7}"
-
